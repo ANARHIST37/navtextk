@@ -1,9 +1,9 @@
 import { useState } from 'react';
 
-type Method = 'oncalcwidth' | 'onprintcolumnheader' | 'delphi-code' | 'onbeforeprint';
+type Method = 'script' | 'delphi';
 
 export default function App() {
-  const [activeMethod, setActiveMethod] = useState<Method>('oncalcwidth');
+  const [activeMethod, setActiveMethod] = useState<Method>('script');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
@@ -13,12 +13,85 @@ export default function App() {
     });
   };
 
-  const methods: { id: Method; title: string; icon: string; recommended?: boolean }[] = [
-    { id: 'oncalcwidth', title: 'OnCalcWidth', icon: '📏', recommended: true },
-    { id: 'onprintcolumnheader', title: 'OnPrintColumnHeader', icon: '🖨️' },
-    { id: 'delphi-code', title: 'Из кода Delphi', icon: '🔧' },
-    { id: 'onbeforeprint', title: 'OnBeforePrint', icon: '⚡' },
+  const methods: { id: Method; title: string; icon: string }[] = [
+    { id: 'script', title: 'Скрипт отчёта (PascalScript)', icon: '📝' },
+    { id: 'delphi', title: 'Из кода Delphi', icon: '🔧' },
   ];
+
+  // Код для скрипта отчёта
+  const scriptCode = `procedure DBCross1OnPrintRowHeader(Memo: TfrxMemoView;
+  HeaderIndexes, HeaderValues, Value: Variant);
+begin
+  // HeaderIndexes[0] — индекс уровня строки:
+  //   0 = SHOP_NAME
+  //   1 = ROW_ORDER   ← скрываем
+  //   2 = METRIC_NAME
+  if HeaderIndexes[0] = 1 then
+  begin
+    Memo.Visible := False;
+    Memo.Width := 0;
+  end;
+end;
+
+procedure DBCross1OnPrintCell(Memo: TfrxMemoView;
+  RowIndex, ColumnIndex, CellIndex: Integer;
+  RowValues, ColumnValues, Value: Variant);
+begin
+  // CellIndex — индекс поля строки:
+  //   0 = SHOP_NAME
+  //   1 = ROW_ORDER   ← скрываем
+  //   2 = METRIC_NAME
+  if CellIndex = 1 then
+  begin
+    Memo.Visible := False;
+    Memo.Width := 0;
+  end;
+end;`;
+
+  // Код для Delphi
+  const delphiCode = `// В форме, перед генерацией отчёта:
+procedure TForm1.btnPrintClick(Sender: TObject);
+var
+  DBCross: TfrxDBCrossView;
+begin
+  DBCross := TfrxDBCrossView(
+    frxReport1.FindObject('DBCross1'));
+
+  if DBCross <> nil then
+  begin
+    DBCross.OnPrintRowHeader := @DBCrossPrintRowHeader;
+    DBCross.OnPrintCell := @DBCrossPrintCell;
+  end;
+
+  frxReport1.ShowReport;
+end;
+
+// Обработчик заголовков строк
+procedure TForm1.DBCrossPrintRowHeader(
+  Memo: TfrxMemoView;
+  HeaderIndexes, HeaderValues, Value: Variant);
+begin
+  // Скрыть уровень ROW_ORDER (индекс 1)
+  if HeaderIndexes[0] = 1 then
+  begin
+    Memo.Visible := False;
+    Memo.Width := 0;
+  end;
+end;
+
+// Обработчик ячеек
+procedure TForm1.DBCrossPrintCell(
+  Memo: TfrxMemoView;
+  RowIndex, ColumnIndex, CellIndex: Integer;
+  RowValues, ColumnValues, Value: Variant);
+begin
+  // Скрыть ячейки ROW_ORDER (индекс 1)
+  if CellIndex = 1 then
+  begin
+    Memo.Visible := False;
+    Memo.Width := 0;
+  end;
+end;`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
@@ -29,433 +102,304 @@ export default function App() {
             FR
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white">FastReport 6 VCL</h1>
-            <p className="text-xs text-slate-400">Скрытие колонки в DBCrossTab (DBCross1)</p>
+            <h1 className="text-lg font-bold text-white">FastReport 6 VCL — DBCross1</h1>
+            <p className="text-xs text-slate-400">Скрытие поля ROW_ORDER в кросстаблице</p>
           </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* Intro */}
-        <section className="mb-10">
-          <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            Как скрыть колонку в DBCrossTab
+        {/* Structure */}
+        <section className="mb-8">
+          <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            Структура вашего DBCross1
           </h2>
-          <p className="text-slate-300 text-lg leading-relaxed">
-            В FastReport 6 VCL объект <code className="px-2 py-0.5 rounded bg-slate-700 text-blue-300 text-sm font-mono">DBCrossTab</code> (имя: <code className="px-2 py-0.5 rounded bg-slate-700 text-green-300 text-sm font-mono">DBCross1</code>) не имеет прямого свойства <code className="px-2 py-0.5 rounded bg-slate-700 text-red-300 text-sm font-mono">Visible</code> для отдельных колонок. 
-            Вместо этого используется несколько подходов через события объекта.
-          </p>
-        </section>
 
-        {/* Method tabs */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {methods.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setActiveMethod(m.id)}
-              className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
-                activeMethod === m.id
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                  : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
-              }`}
-            >
-              <span>{m.icon}</span>
-              <span>{m.title}</span>
-              {m.recommended && (
-                <span className="px-1.5 py-0.5 text-[10px] bg-green-500/20 text-green-400 rounded-full border border-green-500/30">
-                  рекомендуется
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
-        <div className="space-y-6">
-          {/* Method 1: OnCalcWidth */}
-          {activeMethod === 'oncalcwidth' && (
-            <div className="space-y-6">
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-2xl">📏</span>
-                  <h3 className="text-xl font-bold text-white">Способ 1: Событие OnCalcWidth (рекомендуется)</h3>
-                </div>
-                <p className="text-slate-300 mb-4">
-                  Самый надёжный способ — установить ширину колонки в <code className="px-1.5 py-0.5 rounded bg-slate-700 text-yellow-300 text-sm font-mono">0</code> в обработчике события <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-sm font-mono">OnCalcWidth</code>. 
-                  Это событие вызывается перед расчётом ширины каждой колонки.
-                </p>
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
-                  <p className="text-amber-200 text-sm flex items-start gap-2">
-                    <span className="text-lg">⚠️</span>
-                    <span><strong>Важно:</strong> Итоговые значения (Totals) не пересчитываются при скрытии колонки, т.к. таблица уже заполнена данными к моменту вызова события.</span>
-                  </p>
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Row Fields */}
+              <div className="bg-slate-700/30 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-blue-400 mb-3 uppercase tracking-wide">RowFields (строки)</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="w-5 h-5 rounded bg-slate-600 flex items-center justify-center text-[10px] font-bold text-slate-300">0</span>
+                    <span className="text-slate-200 font-mono">SHOP_NAME</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+                    <span className="w-5 h-5 rounded bg-red-500/30 flex items-center justify-center text-[10px] font-bold text-red-300">1</span>
+                    <span className="text-red-300 font-mono font-bold">ROW_ORDER</span>
+                    <span className="text-[10px] text-red-400 ml-auto">скрыть</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="w-5 h-5 rounded bg-slate-600 flex items-center justify-center text-[10px] font-bold text-slate-300">2</span>
+                    <span className="text-slate-200 font-mono">METRIC_NAME</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Pascal Script */}
-              <CodeBlock
-                id="calcwidth-pascal"
-                title="Pascal Script (внутри отчёта)"
-                language="pascal"
-                copiedId={copiedId}
-                onCopy={copyToClipboard}
-                code={`procedure DBCross1OnCalcWidth(ColumnIndex: Integer;
-  ColumnValues: Variant; var Width: Extended);
-begin
-  // Скрыть колонку по индексу (нумерация с 0)
-  if ColumnIndex = 2 then
-    Width := 0;
-  
-  // Или скрыть по значению заголовка
-  // if (VarToStr(ColumnValues[0]) = '2024') and
-  //    (VarToStr(ColumnValues[1]) = '03') then
-  //   Width := 0;
-end;`}              />
-
-              {/* C++ Script */}
-              <CodeBlock
-                id="calcwidth-cpp"
-                title="C++ Script"
-                language="cpp"
-                copiedId={copiedId}
-                onCopy={copyToClipboard}
-                code={`void DBCross1OnCalcWidth(int ColumnIndex,
-  Variant ColumnValues, Extended &Width)
-{
-  if (ColumnIndex == 2)
-    Width = 0;
-}`}
-              />
-            </div>
-          )}
-
-          {/* Method 2: OnPrintColumnHeader */}
-          {activeMethod === 'onprintcolumnheader' && (
-            <div className="space-y-6">
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-2xl">🖨️</span>
-                  <h3 className="text-xl font-bold text-white">Способ 2: Событие OnPrintColumnHeader</h3>
+              {/* Column Fields */}
+              <div className="bg-slate-700/30 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-green-400 mb-3 uppercase tracking-wide">ColumnFields (колонки)</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="w-5 h-5 rounded bg-slate-600 flex items-center justify-center text-[10px] font-bold text-slate-300">0</span>
+                    <span className="text-slate-200 font-mono">DAY_NUM</span>
+                  </div>
                 </div>
-                <p className="text-slate-300 mb-4">
-                  Альтернативный способ — скрыть заголовок колонки через событие <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-sm font-mono">OnPrintColumnHeader</code>. 
-                  Подходит для DBCrossTab (<code className="px-1.5 py-0.5 rounded bg-slate-700 text-green-300 text-sm font-mono">DBCross1</code>), когда нужно скрыть колонку по значению заголовка.
-                </p>
               </div>
 
-              <CodeBlock
-                id="printcol-pascal"
-                title="Pascal Script"
-                language="pascal"
-                copiedId={copiedId}
-                onCopy={copyToClipboard}
-                code={`procedure DBCross1OnPrintColumnHeader(Memo: TfrxMemoView;
-  HeaderIndexes, HeaderValues, Value: Variant);
-begin
-  if VarToStr(HeaderValues[0]) = '14001' then
-  begin
-    Memo.Width := 0;
-    Memo.Height := 0;
-    Memo.Visible := False;
-    Memo.Printable := False;
-  end;
-end;`}
-              />
-
-              <CodeBlock
-                id="printcol-by-index"
-                title="Скрытие по индексу заголовка"
-                language="pascal"
-                copiedId={copiedId}
-                onCopy={copyToClipboard}
-                code={`procedure DBCross1OnPrintColumnHeader(Memo: TfrxMemoView;
-  HeaderIndexes, HeaderValues, Value: Variant);
-begin
-  // HeaderIndexes[0] - индекс на верхнем уровне
-  // HeaderIndexes[1] - индекс на следующем уровне
-  if (HeaderIndexes[0] = 0) and (HeaderIndexes[1] = 2) then
-  begin
-    Memo.Visible := False;
-    Memo.Width := 0;
-  end;
-end;`}
-              />
-            </div>
-          )}
-
-          {/* Method 3: From Delphi code */}
-          {activeMethod === 'delphi-code' && (
-            <div className="space-y-6">
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-2xl">🔧</span>
-                  <h3 className="text-xl font-bold text-white">Способ 3: Из кода Delphi (runtime)</h3>
-                </div>
-                <p className="text-slate-300 mb-4">
-                  Если нужно управлять видимостью колонок из кода приложения (не из скрипта отчёта), 
-                  назначьте обработчик события программно.
-                </p>
-              </div>
-
-              <CodeBlock
-                id="delphi-event"
-                title="Назначение обработчика в Delphi"
-                language="delphi"
-                copiedId={copiedId}
-                onCopy={copyToClipboard}
-                code={`// В форме назначаем обработчик перед генерацией отчёта
-procedure TForm1.btnPrintClick(Sender: TObject);
-var
-  DBCross: TfrxDBCrossTabView;
-begin
-  // Находим объект DBCrossTab в отчёте
-  DBCross := TfrxDBCrossTabView(
-    frxReport1.FindObject('DBCross1'));
-  
-  if DBCross <> nil then
-    DBCross.OnCalcWidth := @DBCrossCalcWidth;
-  
-  frxReport1.ShowReport;
-end;
-
-// Обработчик события
-procedure TForm1.DBCrossCalcWidth(
-  ColumnIndex: Integer;
-  ColumnValues: Variant;
-  var Width: Extended);
-begin
-  // Скрыть колонку с индексом 2
-  if ColumnIndex = 2 then
-    Width := 0;
-end;`}
-              />
-
-              <CodeBlock
-                id="delphi-hide-all"
-                title="Скрытие нескольких колонок по условию"
-                language="delphi"
-                copiedId={copiedId}
-                onCopy={copyToClipboard}
-                code={`procedure TForm1.CrossCalcWidth(
-  ColumnIndex: Integer;
-  ColumnValues: Variant;
-  var Width: Extended);
-var
-  colName: string;
-begin
-  colName := VarToStr(ColumnValues[0]);
-  
-  // Скрыть колонки из списка
-  if (colName = 'КолонкаA') or 
-     (colName = 'КолонкаB') then
-    Width := 0;
-end;`}
-              />
-            </div>
-          )}
-
-          {/* Method 4: OnBeforePrint */}
-          {activeMethod === 'onbeforeprint' && (
-            <div className="space-y-6">
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-2xl">⚡</span>
-                  <h3 className="text-xl font-bold text-white">Способ 4: Событие OnBeforePrint</h3>
-                </div>
-                <p className="text-slate-300 mb-4">
-                  Событие <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-sm font-mono">OnBeforePrint</code> вызывается перед печатью всей таблицы DBCross1. 
-                  Здесь можно использовать методы DBCrossTab для анализа структуры.
-                </p>
-              </div>
-
-              <CodeBlock
-                id="beforeprint-pascal"
-                title="Pascal Script — использование методов DBCrossTab"
-                language="pascal"
-                copiedId={copiedId}
-                onCopy={copyToClipboard}
-                code={`procedure DBCross1OnBeforePrint(Sender: TfrxComponent);
-var
-  i: Integer;
-begin
-  // Доступные методы DBCrossTab:
-  // ColCount - количество колонок
-  // RowCount - количество строк
-  // IsGrandTotalColumn(Index) - колонка является итогом
-  // IsTotalColumn(Index) - колонка является подитогом
-  
-  // Пример: скрыть последнюю колонку
-  // (через OnCalcWidth, вызываемый после OnBeforePrint)
-end;
-
-// Основная логика скрытия — в OnCalcWidth
-procedure DBCross1OnCalcWidth(ColumnIndex: Integer;
-  ColumnValues: Variant; var Width: Extended);
-begin
-  // Скрыть все итоговые колонки
-  // if DBCross1.IsGrandTotalColumn(ColumnIndex) then
-  //   Width := 0;
-  
-  // Скрыть колонку по индексу
-  if ColumnIndex = 3 then
-    Width := 0;
-end;`}
-              />
-
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-                <h4 className="text-lg font-semibold text-white mb-3">Доступные методы CrossTab в скрипте:</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-600">
-                        <th className="text-left py-2 px-3 text-slate-400 font-medium">Метод</th>
-                        <th className="text-left py-2 px-3 text-slate-400 font-medium">Описание</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-slate-300">
-                      <tr className="border-b border-slate-700/50">
-                        <td className="py-2 px-3 font-mono text-blue-300">ColCount</td>
-                        <td className="py-2 px-3">Возвращает количество колонок</td>
-                      </tr>
-                      <tr className="border-b border-slate-700/50">
-                        <td className="py-2 px-3 font-mono text-blue-300">RowCount</td>
-                        <td className="py-2 px-3">Возвращает количество строк</td>
-                      </tr>
-                      <tr className="border-b border-slate-700/50">
-                        <td className="py-2 px-3 font-mono text-blue-300">IsGrandTotalColumn(Index)</td>
-                        <td className="py-2 px-3">True, если колонка — общий итог</td>
-                      </tr>
-                      <tr className="border-b border-slate-700/50">
-                        <td className="py-2 px-3 font-mono text-blue-300">IsTotalColumn(Index)</td>
-                        <td className="py-2 px-3">True, если колонка — подитог</td>
-                      </tr>
-                      <tr className="border-b border-slate-700/50">
-                        <td className="py-2 px-3 font-mono text-blue-300">IsGrandTotalRow(Index)</td>
-                        <td className="py-2 px-3">True, если строка — общий итог</td>
-                      </tr>
-                      <tr className="border-b border-slate-700/50">
-                        <td className="py-2 px-3 font-mono text-blue-300">IsTotalRow(Index)</td>
-                        <td className="py-2 px-3">True, если строка — подитог</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2 px-3 font-mono text-blue-300">AddValue(...)</td>
-                        <td className="py-2 px-3">Добавить значение в таблицу</td>
-                      </tr>
-                    </tbody>
-                  </table>
+              {/* Cell Fields */}
+              <div className="bg-slate-700/30 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-yellow-400 mb-3 uppercase tracking-wide">CellFields (ячейки)</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="w-5 h-5 rounded bg-slate-600 flex items-center justify-center text-[10px] font-bold text-slate-300">0</span>
+                    <span className="text-slate-200 font-mono">METRIC_VALUE</span>
+                  </div>
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Summary table */}
-          <section className="mt-10 bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <span>📋</span> Сводная таблица событий DBCrossTab
-            </h3>
+          {/* Visual table */}
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+            <h4 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wide">Как выглядит таблица (визуально):</h4>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-600">
-                    <th className="text-left py-3 px-3 text-slate-400 font-medium">Событие</th>
-                    <th className="text-left py-3 px-3 text-slate-400 font-medium">Когда вызывается</th>
-                    <th className="text-left py-3 px-3 text-slate-400 font-medium">Для скрытия</th>
-                  </tr>
-                </thead>
-                <tbody className="text-slate-300">
-                  <tr className="border-b border-slate-700/50 bg-green-500/5">
-                    <td className="py-3 px-3 font-mono text-green-300 font-medium">OnCalcWidth</td>
-                    <td className="py-3 px-3">Перед расчётом ширины колонки</td>
-                    <td className="py-3 px-3">Установить <code className="text-yellow-300">Width := 0</code></td>
-                  </tr>
-                  <tr className="border-b border-slate-700/50">
-                    <td className="py-3 px-3 font-mono text-blue-300">OnCalcHeight</td>
-                    <td className="py-3 px-3">Перед расчётом высоты строки</td>
-                    <td className="py-3 px-3">Установить <code className="text-yellow-300">Height := 0</code></td>
-                  </tr>
-                  <tr className="border-b border-slate-700/50">
-                    <td className="py-3 px-3 font-mono text-blue-300">OnPrintColumnHeader</td>
-                    <td className="py-3 px-3">Перед выводом заголовка колонки</td>
-                    <td className="py-3 px-3">Memo.Visible := False</td>
-                  </tr>
-                  <tr className="border-b border-slate-700/50">
-                    <td className="py-3 px-3 font-mono text-blue-300">OnPrintRowHeader</td>
-                    <td className="py-3 px-3">Перед выводом заголовка строки</td>
-                    <td className="py-3 px-3">Memo.Visible := False</td>
-                  </tr>
-                  <tr className="border-b border-slate-700/50">
-                    <td className="py-3 px-3 font-mono text-blue-300">OnPrintCell</td>
-                    <td className="py-3 px-3">Перед выводом ячейки данных</td>
-                    <td className="py-3 px-3">Изменить дизайн/содержимое</td>
-                  </tr>
-                  <tr className="border-b border-slate-700/50">
-                    <td className="py-3 px-3 font-mono text-blue-300">OnBeforePrint</td>
-                    <td className="py-3 px-3">Перед печатью таблицы</td>
-                    <td className="py-3 px-3">Подготовка данных</td>
+                  <tr>
+                    <th className="border border-slate-600 bg-slate-700/50 px-3 py-2 text-slate-300" rowSpan={2}>SHOP_NAME</th>
+                    <th className="border border-red-500/50 bg-red-500/10 px-3 py-2 text-red-300 font-bold" rowSpan={2}>
+                      ROW_ORDER
+                      <span className="block text-[9px] text-red-400 font-normal mt-0.5">← скрыть</span>
+                    </th>
+                    <th className="border border-slate-600 bg-slate-700/50 px-3 py-2 text-slate-300" rowSpan={2}>METRIC_NAME</th>
+                    <th className="border border-slate-600 bg-slate-700/50 px-3 py-2 text-slate-300 text-center" colSpan={3}>DAY_NUM</th>
                   </tr>
                   <tr>
-                    <td className="py-3 px-3 font-mono text-blue-300">OnAfterPrint</td>
-                    <td className="py-3 px-3">После печати таблицы</td>
-                    <td className="py-3 px-3">—</td>
+                    <th className="border border-slate-600 bg-slate-700/30 px-3 py-1.5 text-slate-400">1</th>
+                    <th className="border border-slate-600 bg-slate-700/30 px-3 py-1.5 text-slate-400">2</th>
+                    <th className="border border-slate-600 bg-slate-700/30 px-3 py-1.5 text-slate-400">...</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-slate-600 bg-slate-700/20 px-3 py-1.5 text-slate-300">Магазин А</td>
+                    <td className="border border-red-500/30 bg-red-500/5 px-3 py-1.5 text-red-300/70 line-through">1</td>
+                    <td className="border border-slate-600 bg-slate-700/20 px-3 py-1.5 text-slate-300">Выручка</td>
+                    <td className="border border-slate-600 bg-slate-700/10 px-3 py-1.5 text-slate-400 text-center">100</td>
+                    <td className="border border-slate-600 bg-slate-700/10 px-3 py-1.5 text-slate-400 text-center">200</td>
+                    <td className="border border-slate-600 bg-slate-700/10 px-3 py-1.5 text-slate-400 text-center">...</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-600 bg-slate-700/20 px-3 py-1.5 text-slate-300">Магазин А</td>
+                    <td className="border border-red-500/30 bg-red-500/5 px-3 py-1.5 text-red-300/70 line-through">2</td>
+                    <td className="border border-slate-600 bg-slate-700/20 px-3 py-1.5 text-slate-300">Трафик</td>
+                    <td className="border border-slate-600 bg-slate-700/10 px-3 py-1.5 text-slate-400 text-center">50</td>
+                    <td className="border border-slate-600 bg-slate-700/10 px-3 py-1.5 text-slate-400 text-center">60</td>
+                    <td className="border border-slate-600 bg-slate-700/10 px-3 py-1.5 text-slate-400 text-center">...</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </section>
+          </div>
+        </section>
 
-          {/* Tips */}
-          <section className="mt-8 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-6">
-            <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-              <span>💡</span> Полезные советы
+        {/* Solution */}
+        <section className="mb-8">
+          <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+            Решение
+          </h2>
+
+          <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5 mb-6">
+            <p className="text-green-200 text-sm flex items-start gap-2">
+              <span className="text-lg">✅</span>
+              <span>
+                <code className="font-mono text-green-300">ROW_ORDER</code> — это второй уровень строк (<strong>индекс 1</strong>). 
+                Чтобы скрыть его, нужно обработать два события: <code className="font-mono text-blue-300">OnPrintRowHeader</code> (заголовки) 
+                и <code className="font-mono text-blue-300">OnPrintCell</code> (ячейки данных строк).
+              </span>
+            </p>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {methods.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setActiveMethod(m.id)}
+                className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+                  activeMethod === m.id
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                    : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+              >
+                <span>{m.icon}</span>
+                <span>{m.title}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Script tab */}
+          {activeMethod === 'script' && (
+            <div className="space-y-6">
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+                <h4 className="text-base font-semibold text-white mb-2">Инструкция:</h4>
+                <ol className="text-sm text-slate-300 space-y-2 list-decimal list-inside">
+                  <li>Откройте отчёт в дизайнере FastReport</li>
+                  <li>Выделите объект <code className="px-1.5 py-0.5 rounded bg-slate-700 text-green-300 text-xs font-mono">DBCross1</code></li>
+                  <li>В инспекторе объектов перейдите на вкладку <strong>Events</strong></li>
+                  <li>Дважды кликните по событию <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">OnPrintRowHeader</code></li>
+                  <li>Добавьте код для <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">OnPrintRowHeader</code> и <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">OnPrintCell</code></li>
+                </ol>
+              </div>
+
+              <CodeBlock
+                id="script-main"
+                title="Скрипт отчёта — PascalScript"
+                language="pascal"
+                copiedId={copiedId}
+                onCopy={copyToClipboard}
+                code={scriptCode}
+              />
+            </div>
+          )}
+
+          {/* Delphi tab */}
+          {activeMethod === 'delphi' && (
+            <div className="space-y-6">
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+                <h4 className="text-base font-semibold text-white mb-2">Инструкция:</h4>
+                <ol className="text-sm text-slate-300 space-y-2 list-decimal list-inside">
+                  <li>Найдите объект <code className="px-1.5 py-0.5 rounded bg-slate-700 text-green-300 text-xs font-mono">DBCross1</code> в отчёте через <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">FindObject</code></li>
+                  <li>Назначьте обработчики событий программно</li>
+                  <li>Вызовите <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">ShowReport</code> или <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">PrepareReport</code></li>
+                </ol>
+              </div>
+
+              <CodeBlock
+                id="delphi-main"
+                title="Код Delphi"
+                language="delphi"
+                copiedId={copiedId}
+                onCopy={copyToClipboard}
+                code={delphiCode}
+              />
+            </div>
+          )}
+        </section>
+
+        {/* Explanation */}
+        <section className="mb-8">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <span>🔍</span> Как это работает
             </h3>
-            <ul className="space-y-3 text-slate-300">
+            <div className="space-y-4 text-sm text-slate-300">
+              <div className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs shrink-0">1</span>
+                <div>
+                  <p className="font-semibold text-white mb-1">OnPrintRowHeader</p>
+                  <p>Вызывается для каждой ячейки заголовка строки. Параметр <code className="px-1.5 py-0.5 rounded bg-slate-700 text-yellow-300 text-xs font-mono">HeaderIndexes[0]</code> содержит индекс уровня строки. Для <code className="text-red-300">ROW_ORDER</code> это <strong>1</strong>.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs shrink-0">2</span>
+                <div>
+                  <p className="font-semibold text-white mb-1">OnPrintCell</p>
+                  <p>Вызывается для каждой ячейки в области строк (левая часть таблицы). Параметр <code className="px-1.5 py-0.5 rounded bg-slate-700 text-yellow-300 text-xs font-mono">CellIndex</code> содержит индекс поля строки. Для <code className="text-red-300">ROW_ORDER</code> это тоже <strong>1</strong>.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-xs shrink-0">✓</span>
+                <div>
+                  <p className="font-semibold text-white mb-1">Результат</p>
+                  <p>Установка <code className="px-1.5 py-0.5 rounded bg-slate-700 text-yellow-300 text-xs font-mono">Visible := False</code> и <code className="px-1.5 py-0.5 rounded bg-slate-700 text-yellow-300 text-xs font-mono">Width := 0</code> полностью убирает колонку <code className="text-red-300">ROW_ORDER</code> из вывода.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Important notes */}
+        <section className="mb-8">
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5">
+            <h4 className="text-base font-semibold text-amber-200 mb-3 flex items-center gap-2">
+              <span>⚠️</span> Важные замечания
+            </h4>
+            <ul className="space-y-2 text-sm text-amber-100/80">
               <li className="flex items-start gap-2">
-                <span className="text-blue-400 mt-1">•</span>
-                <span>Используйте <code className="px-1.5 py-0.5 rounded bg-slate-700 text-yellow-300 text-xs font-mono">VarToStr()</code> при сравнении значений заголовков — FastReport автоматически пытается преобразовать строки в числа, что может вызвать ошибки с «Итого» и «Общий итог».</span>
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span>Оба обработчика (<code className="font-mono text-amber-300">OnPrintRowHeader</code> и <code className="font-mono text-amber-300">OnPrintCell</code>) нужны для полного скрытия — первый убирает заголовки, второй — данные.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-blue-400 mt-1">•</span>
-                <span>Нумерация колонок и строк начинается с <code className="px-1.5 py-0.5 rounded bg-slate-700 text-yellow-300 text-xs font-mono">0</code>.</span>
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span>Нумерация уровней строк начинается с <strong>0</strong>: SHOP_NAME=0, ROW_ORDER=1, METRIC_NAME=2.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-blue-400 mt-1">•</span>
-                <span>Параметры <code className="px-1.5 py-0.5 rounded bg-slate-700 text-yellow-300 text-xs font-mono">ColumnValues</code> и <code className="px-1.5 py-0.5 rounded bg-slate-700 text-yellow-300 text-xs font-mono">HeaderValues</code> — массивы Variant с нулевой базой. Элемент [0] — верхний уровень заголовка, [1] — следующий уровень и т.д.</span>
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span>Если нужно скрыть поле по условию (например, только для определённых магазинов), добавьте проверку значения через <code className="font-mono text-amber-300">HeaderValues</code> или <code className="font-mono text-amber-300">RowValues</code>.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-blue-400 mt-1">•</span>
-                <span>Для DB CrossTab используется класс <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">TfrxDBCrossTabView</code> (в Delphi) или <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">TfrxDBCrossTab</code> (в скрипте). Имя объекта в вашем отчёте — <code className="px-1.5 py-0.5 rounded bg-slate-700 text-green-300 text-xs font-mono">DBCross1</code>.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-400 mt-1">•</span>
-                <span>Если нужно скрыть колонку <strong>полностью</strong> (и данные, и заголовок), используйте <code className="px-1.5 py-0.5 rounded bg-slate-700 text-green-300 text-xs font-mono">OnCalcWidth</code> с <code className="px-1.5 py-0.5 rounded bg-slate-700 text-yellow-300 text-xs font-mono">Width := 0</code>.</span>
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span>Тип объекта в файле: <code className="font-mono text-amber-300">TfrxDBCrossView</code> (класс в Delphi).</span>
               </li>
             </ul>
-          </section>
+          </div>
+        </section>
 
-          {/* Links */}
-          <section className="mt-8 text-center text-sm text-slate-500 pb-8">
-            <p>
-              Документация:{' '}
-              <a href="https://www.fast-report.com/public_download/docs/FRVCL/online/en/FastReportVCL/UserManual/en-US/Cross_tab_reports/Managing_a_cross-table_from_the_script.html" 
-                 target="_blank" rel="noopener noreferrer"
-                 className="text-blue-400 hover:text-blue-300 underline underline-offset-2">
-                FastReport VCL — Managing a cross-tab in script
-              </a>
-            </p>
-          </section>
-        </div>
+        {/* Conditional example */}
+        <section className="mb-8">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <span>💡</span> Бонус: Скрытие по условию
+            </h3>
+            <p className="text-sm text-slate-300 mb-4">Если нужно скрывать ROW_ORDER только при определённых условиях:</p>
+            <CodeBlock
+              id="conditional"
+              title="Условное скрытие"
+              language="pascal"
+              copiedId={copiedId}
+              onCopy={copyToClipboard}
+              code={`procedure DBCross1OnPrintRowHeader(Memo: TfrxMemoView;
+  HeaderIndexes, HeaderValues, Value: Variant);
+begin
+  if HeaderIndexes[0] = 1 then  // ROW_ORDER
+  begin
+    // Пример: скрыть если значение = '0'
+    // if VarToStr(HeaderValues[0]) = '0' then
+    // begin
+    //   Memo.Visible := False;
+    //   Memo.Width := 0;
+    // end;
+
+    // Или скрыть всегда:
+    Memo.Visible := False;
+    Memo.Width := 0;
+  end;
+end;`}
+            />
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="text-center text-sm text-slate-500 pb-8 pt-4 border-t border-slate-700/30">
+          <p>
+            FastReport 6 VCL • DBCross1 • Отчёт: PressReport • DataSet: frxDSPressReport
+          </p>
+        </footer>
       </main>
     </div>
   );
 }
 
-function CodeBlock({ 
-  id, title, language, code, copiedId, onCopy 
-}: { 
-  id: string; 
-  title: string; 
-  language: string; 
-  code: string; 
+function CodeBlock({
+  id, title, language, code, copiedId, onCopy
+}: {
+  id: string;
+  title: string;
+  language: string;
+  code: string;
   copiedId: string | null;
   onCopy: (text: string, id: string) => void;
 }) {
