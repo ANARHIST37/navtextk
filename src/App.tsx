@@ -30,7 +30,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-white">FastReport 6 VCL</h1>
-            <p className="text-xs text-slate-400">Скрытие колонки в CrossTab</p>
+            <p className="text-xs text-slate-400">Скрытие колонки в DBCrossTab (DBCross1)</p>
           </div>
         </div>
       </header>
@@ -39,10 +39,10 @@ export default function App() {
         {/* Intro */}
         <section className="mb-10">
           <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            Как скрыть колонку в CrossTab
+            Как скрыть колонку в DBCrossTab
           </h2>
           <p className="text-slate-300 text-lg leading-relaxed">
-            В FastReport 6 VCL объект <code className="px-2 py-0.5 rounded bg-slate-700 text-blue-300 text-sm font-mono">CrossTab</code> (или <code className="px-2 py-0.5 rounded bg-slate-700 text-blue-300 text-sm font-mono">DBCrossTab</code>) не имеет прямого свойства <code className="px-2 py-0.5 rounded bg-slate-700 text-red-300 text-sm font-mono">Visible</code> для отдельных колонок. 
+            В FastReport 6 VCL объект <code className="px-2 py-0.5 rounded bg-slate-700 text-blue-300 text-sm font-mono">DBCrossTab</code> (имя: <code className="px-2 py-0.5 rounded bg-slate-700 text-green-300 text-sm font-mono">DBCross1</code>) не имеет прямого свойства <code className="px-2 py-0.5 rounded bg-slate-700 text-red-300 text-sm font-mono">Visible</code> для отдельных колонок. 
             Вместо этого используется несколько подходов через события объекта.
           </p>
         </section>
@@ -99,19 +99,18 @@ export default function App() {
                 language="pascal"
                 copiedId={copiedId}
                 onCopy={copyToClipboard}
-                code={`procedure Cross1OnCalcWidth(ColumnIndex: Integer;
+                code={`procedure DBCross1OnCalcWidth(ColumnIndex: Integer;
   ColumnValues: Variant; var Width: Extended);
 begin
   // Скрыть колонку по индексу (нумерация с 0)
   if ColumnIndex = 2 then
     Width := 0;
-
+  
   // Или скрыть по значению заголовка
   // if (VarToStr(ColumnValues[0]) = '2024') and
   //    (VarToStr(ColumnValues[1]) = '03') then
   //   Width := 0;
-end;`}
-              />
+end;`}              />
 
               {/* C++ Script */}
               <CodeBlock
@@ -120,7 +119,7 @@ end;`}
                 language="cpp"
                 copiedId={copiedId}
                 onCopy={copyToClipboard}
-                code={`void Cross1OnCalcWidth(int ColumnIndex,
+                code={`void DBCross1OnCalcWidth(int ColumnIndex,
   Variant ColumnValues, Extended &Width)
 {
   if (ColumnIndex == 2)
@@ -140,7 +139,7 @@ end;`}
                 </div>
                 <p className="text-slate-300 mb-4">
                   Альтернативный способ — скрыть заголовок колонки через событие <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-sm font-mono">OnPrintColumnHeader</code>. 
-                  Подходит для DB CrossTab, когда нужно скрыть колонку по значению заголовка.
+                  Подходит для DBCrossTab (<code className="px-1.5 py-0.5 rounded bg-slate-700 text-green-300 text-sm font-mono">DBCross1</code>), когда нужно скрыть колонку по значению заголовка.
                 </p>
               </div>
 
@@ -169,7 +168,7 @@ end;`}
                 language="pascal"
                 copiedId={copiedId}
                 onCopy={copyToClipboard}
-                code={`procedure Cross1OnPrintColumnHeader(Memo: TfrxMemoView;
+                code={`procedure DBCross1OnPrintColumnHeader(Memo: TfrxMemoView;
   HeaderIndexes, HeaderValues, Value: Variant);
 begin
   // HeaderIndexes[0] - индекс на верхнем уровне
@@ -207,20 +206,20 @@ end;`}
                 code={`// В форме назначаем обработчик перед генерацией отчёта
 procedure TForm1.btnPrintClick(Sender: TObject);
 var
-  Cross: TfrxCrossTabView;
+  DBCross: TfrxDBCrossTabView;
 begin
-  // Находим объект CrossTab в отчёте
-  Cross := TfrxCrossTabView(
-    frxReport1.FindObject('Cross1'));
+  // Находим объект DBCrossTab в отчёте
+  DBCross := TfrxDBCrossTabView(
+    frxReport1.FindObject('DBCross1'));
   
-  if Cross <> nil then
-    Cross.OnCalcWidth := @CrossCalcWidth;
+  if DBCross <> nil then
+    DBCross.OnCalcWidth := @DBCrossCalcWidth;
   
   frxReport1.ShowReport;
 end;
 
 // Обработчик события
-procedure TForm1.CrossCalcWidth(
+procedure TForm1.DBCrossCalcWidth(
   ColumnIndex: Integer;
   ColumnValues: Variant;
   var Width: Extended);
@@ -264,22 +263,22 @@ end;`}
                   <h3 className="text-xl font-bold text-white">Способ 4: Событие OnBeforePrint</h3>
                 </div>
                 <p className="text-slate-300 mb-4">
-                  Событие <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-sm font-mono">OnBeforePrint</code> вызывается перед печатью всей таблицы. 
-                  Здесь можно использовать методы CrossTab для анализа структуры.
+                  Событие <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-sm font-mono">OnBeforePrint</code> вызывается перед печатью всей таблицы DBCross1. 
+                  Здесь можно использовать методы DBCrossTab для анализа структуры.
                 </p>
               </div>
 
               <CodeBlock
                 id="beforeprint-pascal"
-                title="Pascal Script — использование методов CrossTab"
+                title="Pascal Script — использование методов DBCrossTab"
                 language="pascal"
                 copiedId={copiedId}
                 onCopy={copyToClipboard}
-                code={`procedure Cross1OnBeforePrint(Sender: TfrxComponent);
+                code={`procedure DBCross1OnBeforePrint(Sender: TfrxComponent);
 var
   i: Integer;
 begin
-  // Доступные методы CrossTab:
+  // Доступные методы DBCrossTab:
   // ColCount - количество колонок
   // RowCount - количество строк
   // IsGrandTotalColumn(Index) - колонка является итогом
@@ -290,11 +289,11 @@ begin
 end;
 
 // Основная логика скрытия — в OnCalcWidth
-procedure Cross1OnCalcWidth(ColumnIndex: Integer;
+procedure DBCross1OnCalcWidth(ColumnIndex: Integer;
   ColumnValues: Variant; var Width: Extended);
 begin
   // Скрыть все итоговые колонки
-  // if Cross1.IsGrandTotalColumn(ColumnIndex) then
+  // if DBCross1.IsGrandTotalColumn(ColumnIndex) then
   //   Width := 0;
   
   // Скрыть колонку по индексу
@@ -352,7 +351,7 @@ end;`}
           {/* Summary table */}
           <section className="mt-10 bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
             <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <span>📋</span> Сводная таблица событий CrossTab
+              <span>📋</span> Сводная таблица событий DBCrossTab
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -424,7 +423,7 @@ end;`}
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-1">•</span>
-                <span>Для DB CrossTab используйте компонент <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">TfrxDBCrossTabView</code>, для обычного — <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">TfrxCrossTabView</code>.</span>
+                <span>Для DB CrossTab используется класс <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">TfrxDBCrossTabView</code> (в Delphi) или <code className="px-1.5 py-0.5 rounded bg-slate-700 text-blue-300 text-xs font-mono">TfrxDBCrossTab</code> (в скрипте). Имя объекта в вашем отчёте — <code className="px-1.5 py-0.5 rounded bg-slate-700 text-green-300 text-xs font-mono">DBCross1</code>.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-1">•</span>
